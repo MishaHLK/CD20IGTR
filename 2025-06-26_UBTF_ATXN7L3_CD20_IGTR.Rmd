@@ -1,0 +1,289 @@
+---
+title: "CD20 Project - UBTF::ATXN7L3 cases"
+author:
+  - name: "Michaela Kotrová"
+    email: m.kotrova@med2.uni-kiel.de
+date: "`r paste('Last updated:', format(Sys.time(), '%Y-%m-%d %H:%M'))`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    toc_float: true
+    theme: cerulean
+---
+
+```{r setup, include = FALSE}
+### Load libraries #############################################################
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(glue)
+library(purrr)
+library(scales)
+library(kableExtra)
+library(writexl)
+library(DT)
+library(readxl)
+library(base)
+library(janitor)
+library(pheatmap)
+
+### Paths ######################################################################
+inputVer <- "C:/Users/mkotrova/Work-SYNC/01.Active Projects/IG_TR_Vergleich_CD20_Veronika/fromVeronika/"
+
+
+### Load myFUNCTIONS ###########################################################
+source('C:/Users/mkotrova/Work-SYNC/R_scripts/2024-04-12_myFUNCTIONS.R')
+
+### New FUNCTIONS ##############################################################
+
+### Load data ##################################################################
+setwd(inputVer)
+
+file_tabVer <- "Tabelle komprimiert - besprochen am 17062025_redundante markiert_orange-red_gelöscht.xlsx"
+
+tabVer <- read_excel(file_tabVer, sheet = "MFI+DNA Blasten sw alt") |>
+  janitor::clean_names()  # Cleans and makes column names unique and syntactically valid
+
+
+```
+
+```{r show-filenames, echo = FALSE, , results='asis'}
+
+knitr::asis_output(glue::glue("
+**Imported Files:**
+
+- `{file_tabVer}`
+
+"))
+
+```
+
+> **Info:**  
+> - Scales normalized column-wise
+
+```{r patients-list, include = FALSE}
+
+patients <- tabVer |>
+  select(lebensnummer, dna_nr, subgruppe) |>
+  filter(subgruppe == "UBTF-ATXN7L3" | subgruppe == "UBTF-AXTN7L3"| subgruppe == "KMT2A"| subgruppe == "ZNF384" | subgruppe == "DUX4" | subgruppe == "PAX5-plus"| subgruppe == "PAX5 P80R"| subgruppe == "PAX5alt") |>
+  select(-subgruppe) |>
+  distinct()
+
+```
+
+```{r flow_d0_data, include = FALSE}
+tabVer_d0 <- tabVer |>
+  dplyr::semi_join(patients, by = "lebensnummer") |> # only keeps rows with lebensnummer values present in patients$lebensnummer
+  filter(zeitp_csv == "d0") |>
+  group_by(lebensnummer) |>
+  arrange(desc(mat == "Knochenmark")) |> # This treats "Knochenmark" as TRUE (1) and others as FALSE (0), sorting rows so "Knochenmark" comes first
+  slice(1) |>
+  ungroup() |>
+  select( -f_nr, -zeitp_csv, -dna_nr, -dna_mat, -sw, -immunphaenotyp, -coo, -age
+  )
+
+
+
+```
+
+```{r flow_d6_data, include = FALSE}
+tabVer_d6 <- tabVer |>
+  dplyr::semi_join(patients, by = "lebensnummer") |> # only keeps rows with lebensnummer values present in patients$lebensnummer
+  filter(zeitp_csv == "d6") |>
+  select( -f_nr, -zeitp_csv, -dna_nr, -dna_mat, -sw, -immunphaenotyp, -coo, -age
+  )
+
+
+```
+
+# d0 expressions by Subgroup {.tabset}
+
+## pro-B
+
+```{r flow_d0_clustered_pro, echo = FALSE}
+# Prepare expression matrix and annotation in one clean flow
+# Step 1: Build data frame with expression and annotation info
+heatmap_data <- tabVer_d0 |>
+  select(-lastname) |>
+  filter(subgruppe == "UBTF-ATXN7L3" | subgruppe == "UBTF-AXTN7L3"| subgruppe == "KMT2A"| subgruppe == "ZNF384") |>
+  arrange(subgruppe)
+
+# Step 3: Extract matrix of CD markers
+expr_matrix <- heatmap_data |>
+  select(-mat, -lebensnummer, -subgruppe) |>
+  as.data.frame() |>
+  mutate(across(everything(), as.numeric)) |>
+  as.matrix()
+
+# Rename columns
+colnames(expr_matrix) <- sub("^blasts_median_", "", colnames(expr_matrix))
+
+# Step 4: Set row names (patient identifiers)
+rownames(expr_matrix) <- heatmap_data$lebensnummer
+
+
+# Step 5: Prepare annotation data
+annotation_df <- heatmap_data |>
+  select(mat, subgruppe) |>
+  as.data.frame()
+rownames(annotation_df) <- heatmap_data$lebensnummer
+
+
+# Step 7: Create the heatmap
+pheatmap::pheatmap(
+  mat = expr_matrix,
+  annotation_row = annotation_df,
+  scale = "column",
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  show_rownames = TRUE,
+  fontsize_row = 4,
+  fontsize_col = 6,
+  angle_col = 90
+)
+```
+
+
+## all
+
+```{r flow_d0_clustered_all, echo = FALSE}
+# Prepare expression matrix and annotation in one clean flow
+# Step 1: Build data frame with expression and annotation info
+heatmap_data <- tabVer_d0 |>
+  select(-lastname) |>
+  arrange(subgruppe)
+
+# Step 3: Extract matrix of CD markers
+expr_matrix <- heatmap_data |>
+  select(-mat, -lebensnummer, -subgruppe) |>
+  as.data.frame() |>
+  mutate(across(everything(), as.numeric)) |>
+  as.matrix()
+
+# Rename columns
+colnames(expr_matrix) <- sub("^blasts_median_", "", colnames(expr_matrix))
+
+# Step 4: Set row names (patient identifiers)
+rownames(expr_matrix) <- heatmap_data$lebensnummer
+
+
+# Step 5: Prepare annotation data
+annotation_df <- heatmap_data |>
+  select(mat, subgruppe) |>
+  as.data.frame()
+rownames(annotation_df) <- heatmap_data$lebensnummer
+
+
+# Step 7: Create the heatmap
+pheatmap::pheatmap(
+  mat = expr_matrix,
+  annotation_row = annotation_df,
+  scale = "column",
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  show_rownames = TRUE,
+  fontsize_row = 2,
+  fontsize_col = 6,
+  angle_col = 90
+)
+```
+
+
+# d6 expressions by Subgroup {.tabset}
+
+## pro-B
+
+```{r flow_d6_clustered_pro, echo = FALSE}
+# Prepare expression matrix and annotation in one clean flow
+# Step 1: Build data frame with expression and annotation info
+heatmap_data <- tabVer_d6 |>
+  select(-lastname) |>
+  filter(subgruppe == "UBTF-ATXN7L3" | subgruppe == "UBTF-AXTN7L3"| subgruppe == "KMT2A"| subgruppe == "ZNF384") |>
+  arrange(subgruppe)
+
+# Step 3: Extract matrix of CD markers
+expr_matrix <- heatmap_data |>
+  select(-mat, -lebensnummer, -subgruppe) |>
+  as.data.frame() |>
+  mutate(across(everything(), as.numeric)) |>
+  as.matrix()
+
+# Rename columns
+colnames(expr_matrix) <- sub("^blasts_median_", "", colnames(expr_matrix))
+
+# Step 4: Set row names as lastnames (patient identifiers)
+rownames(expr_matrix) <- heatmap_data$lebensnummer
+
+# Step 5: Prepare annotation data
+annotation_df <- heatmap_data |>
+  select(mat, subgruppe) |>
+  as.data.frame()
+rownames(annotation_df) <- heatmap_data$lebensnummer
+
+# Step 7: Create the heatmap
+pheatmap::pheatmap(
+  mat = expr_matrix,
+  annotation_row = annotation_df,
+  scale = "column",
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  show_rownames = TRUE,
+  fontsize_row = 4,
+  fontsize_col = 6,
+  angle_col = 90
+)
+
+```
+
+## all
+
+```{r flow_d6_clustered_all, echo = FALSE}
+# Prepare expression matrix and annotation in one clean flow
+# Step 1: Build data frame with expression and annotation info
+heatmap_data <- tabVer_d6 |>
+  select(-lastname) |>
+  arrange(subgruppe)
+
+# Step 3: Extract matrix of CD markers
+expr_matrix <- heatmap_data |>
+  select(-mat, -lebensnummer, -subgruppe) |>
+  as.data.frame() |>
+  mutate(across(everything(), as.numeric)) |>
+  as.matrix()
+
+# Rename columns
+colnames(expr_matrix) <- sub("^blasts_median_", "", colnames(expr_matrix))
+
+# Step 4: Set row names as lastnames (patient identifiers)
+rownames(expr_matrix) <- heatmap_data$lebensnummer
+
+# Step 5: Prepare annotation data
+annotation_df <- heatmap_data |>
+  select(mat, subgruppe) |>
+  as.data.frame()
+rownames(annotation_df) <- heatmap_data$lebensnummer
+
+# Step 7: Create the heatmap
+pheatmap::pheatmap(
+  mat = expr_matrix,
+  annotation_row = annotation_df,
+  scale = "column",
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  show_rownames = TRUE,
+  fontsize_row = 2,
+  fontsize_col = 6,
+  angle_col = 90
+)
+
+```
